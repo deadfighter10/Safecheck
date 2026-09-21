@@ -23,6 +23,7 @@ cd Safecheck
 
 cargo build
 ```
+The test_infected.epub only contains harmless signals, it isn't a real infected file.
 
 Feel free to contribute anything, but master is protected, and you need to create a new branch,
 work on that and then create a PR to contribute. 
