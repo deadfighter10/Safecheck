@@ -1,14 +1,18 @@
 use std::path::PathBuf;
-use derive_more::Display;
 use clap::{Parser};
 
-#[derive(Parser, Debug, Display)]
+#[derive(Parser, Debug)]
 #[command(name = "safecheck")]
 #[command(version)]
 #[command(about = "Static file security analyzer")]
-#[display("File path: {}", path.display())]
 pub struct Args {
-    pub path: PathBuf
+    /// File to scan
+    #[arg(required_unless_present = "update_rules")]
+    pub path: Option<PathBuf>,
+
+    /// Download the latest YARA Forge rules
+    #[arg(long)]
+    pub update_rules: bool
 }
 
 pub fn _parse_arguments() -> Args {

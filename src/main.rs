@@ -4,24 +4,35 @@ mod yara;
 mod report;
 mod entropy;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use cli::_parse_arguments;
 use std::fs::{read, metadata};
 use crate::entropy::get_entropy;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
 use crate::tools::{archive_analysis, get_checksum, get_filetype, process_reported_filetype};
-use crate::yara::{build_rules, get_yara_matches};
+use crate::yara::{get_yara_matches, load_rules, update_rules};
 
 fn main() -> Result<()> {
     let args = _parse_arguments();
+    match args.update_rules {
+        true => {
+            update_rules()?;
+            return Ok(())
+        }
+        false => {}
+    }
 
-    let bytes = read(&args.path)?;
-    let metadata = metadata(&args.path)?;
+    let Some(path) = args.path else {
+        return Err(anyhow!("no file given"));
+    };
+
+    let bytes = read(&path)?;
+    let metadata = metadata(&path)?;
     let filetype = get_filetype(&bytes)?;
-    let reported_filetype = process_reported_filetype(&args.path.extension())?;
+    let reported_filetype = process_reported_filetype(&path.extension())?;
     let checksum = get_checksum(&bytes);
     let mut final_report = Report::new(
-        args.path.clone(),
+        path.clone(),
         metadata,
         checksum,
         reported_filetype,
@@ -33,7 +44,7 @@ fn main() -> Result<()> {
         true => {}
         false => {
             final_report.add_finding(Finding::new(
-                args.path,
+                path,
                 Issue::MagicByte,
                 Severity::Critical,
                 SubSystem::Base
@@ -41,12 +52,12 @@ fn main() -> Result<()> {
         }
     }
 
-    let rule_set = build_rules();
+    let rule_set = load_rules();
     eprintln!(
-        "YARA: {} rule files loaded, {} skipped (yara-x incompatible): {:?}",
+        "YARA: {} ({} files loaded, {} skipped)",
+        rule_set.source,
         rule_set.loaded_files,
-        rule_set.skipped_files.len(),
-        rule_set.skipped_files
+        rule_set.skipped_files.len()
     );
 
     get_yara_matches(&rule_set.rules, &bytes, &mut final_report)?;
