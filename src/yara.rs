@@ -2,42 +2,45 @@ use anyhow::Result;
 use yara_x::{Compiler, Rules, Scanner};
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
 
-pub fn get_yara_matches(rules_source: &str, bytes: &[u8], report: &mut Report) -> Result<()> {
+include!(concat!(env!("OUT_DIR"), "/yara_rules.rs"));
+
+pub struct RuleSet {
+    pub rules: Rules,
+    pub loaded_files: usize,
+    pub skipped_files: Vec<&'static str>,
+}
+
+pub fn build_rules() -> RuleSet {
     let mut compiler = Compiler::new();
+    let mut loaded_files = 0;
+    let mut skipped_files = Vec::new();
 
-    match compiler.add_source(rules_source) {
-        Ok(_) => {}
-        Err(_error) => {}
-    }
-    let rules = compiler.build();
-
-    let mut scanner = Scanner::new(&rules);
-
-    let scan_result = scanner.scan(bytes)?;
-
-    if scan_result.matching_rules().len() != 0 {
-        for matching_rule in scan_result.matching_rules() {
-            report.add_finding(Finding::new(
-                report.filepath.clone(),
-                Issue::YaraIssue(matching_rule.identifier().to_string()),
-                Severity::Critical,
-                SubSystem::Yara
-            ));
+    for (name, source) in RULE_FILES {
+        match compiler.add_source(*source) {
+            Ok(_) => loaded_files += 1,
+            Err(_) => skipped_files.push(*name),
         }
     }
 
-    Ok(())
-
+    RuleSet {
+        rules: compiler.build(),
+        loaded_files,
+        skipped_files,
+    }
 }
 
-pub fn create_yara_rules(rules_source: &str) -> Result<Rules> {
-    let mut compiler = Compiler::new();
+pub fn get_yara_matches(rules: &Rules, bytes: &[u8], report: &mut Report) -> Result<()> {
+    let mut scanner = Scanner::new(rules);
+    let scan_result = scanner.scan(bytes)?;
 
-    match compiler.add_source(rules_source) {
-        Ok(_) => {}
-        Err(_error) => {}
+    for matching_rule in scan_result.matching_rules() {
+        report.add_finding(Finding::new(
+            report.filepath.clone(),
+            Issue::YaraIssue(matching_rule.identifier().to_string()),
+            Severity::Critical,
+            SubSystem::Yara,
+        ));
     }
-    let rules = compiler.build();
 
-    Ok(rules)
+    Ok(())
 }

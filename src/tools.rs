@@ -5,10 +5,9 @@ use sha2::{Digest, Sha256};
 use hex::encode;
 use infer::{Type, get};
 use anyhow::{Result, anyhow};
-use yara_x::Scanner;
+use yara_x::{Rules, Scanner};
 use zip::ZipArchive;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
-use crate::yara::create_yara_rules;
 
 pub const HIGH_RISK_EXTENSIONS: &[&str] = &[
     // Native executables / libraries
@@ -217,18 +216,10 @@ pub fn process_reported_filetype(extension: &Option<&OsStr>) -> Result<String> {
 }
 
 
-pub fn archive_analysis(data: &[u8], report: &mut Report) -> Result<()> {
+pub fn archive_analysis(data: &[u8], rules: &Rules, report: &mut Report) -> Result<()> {
     let cursor = Cursor::new(data);
 
     let mut archive = ZipArchive::new(cursor)?;
-
-    let rules = match create_yara_rules(include_str!("rules/malware_index.yar")) {
-        Ok(rules) => rules,
-        Err(_) => {
-            eprintln!("Scanner cannot be created!");
-            return Ok(());
-        }
-    };
 
     let mut scanner = Scanner::new(&rules);
 

@@ -1,19 +1,28 @@
 use std::fs::Metadata;
 use std::path::{PathBuf};
 use derive_more::Display;
+use crate::entropy::WindowKind;
 use infer::Type;
 
-#[derive(Debug, PartialEq, Display)]
+#[derive(Debug, PartialEq, Display, Clone)]
 pub enum Issue {
     #[display("YaraIssue")]
     YaraIssue(String),
     MagicByte,
     #[display("HighRiskFileType")]
     HighRiskFileType(String),
+    #[display("HighEntropy")]
+    HighEntropy {
+        kind: WindowKind,
+        start: usize,
+        end: usize,
+        entropy: f64,
+        chi2: f64,
+    },
     Size
 }
 
-#[derive(Debug, PartialEq, Display)]
+#[derive(Debug, PartialEq, Display, Copy, Clone)]
 pub enum Severity {
     Critical,
     High,
@@ -21,11 +30,12 @@ pub enum Severity {
     Low
 }
 
-#[derive(Debug, PartialEq, Display)]
+#[derive(Debug, PartialEq, Display, Copy, Clone)]
 pub enum SubSystem {
     Base,
     Yara,
-    Archive
+    Archive,
+    Entropy
 }
 
 #[derive(Debug, PartialEq, Display)]
@@ -111,6 +121,13 @@ impl Report {
         println!("Reported extension {}", self.reported_filetype);
         println!("Real extension: {}", self.real_filetype.extension());
         println!("MIME type: {}", self.real_filetype.mime_type());
+        match self.reported_filetype.trim().to_lowercase()
+            == self.real_filetype.extension().trim().to_lowercase() {
+            true => {}
+            false => {
+                println!("MAGIC BYTE MISMATCH ERROR! | Severity: {}", Severity::Critical)
+            }
+        }
         println!("\nYARA SUBSYSTEM");
         let yara_errors: Vec<_> = self.findings
             .iter()
@@ -119,7 +136,6 @@ impl Report {
         if yara_errors.len() == 0 {
             println!("No Yara errors found.")
         } else {
-            println!("Rule Errors:");
             for i in yara_errors {
                 if let Issue::YaraIssue(rule_name) = &i.issue {
                     println!("Path: {} | Rule: {} | Severity: {}", i.path.display(), rule_name, i.severity);
@@ -138,12 +154,30 @@ impl Report {
         } else {
             for i in archive_errors {
                 if let Issue::YaraIssue(rule) = &i.issue {
-                    println!("Path: {} | Rule: {} | Severity: {}", i.path.display(), rule, i.severity);
+                    println!("Path: {} | Issue: {} | Rule: {} | Severity: {}",
+                             i.path.display(), i.issue, rule, i.severity);
                 } else if let Issue::HighRiskFileType(types) = &i.issue  {
                     println!("Path: {} | Issue: {} | Problem: {} | Severity: {}",
                              i.path.display(), i.issue, types, i.severity);
                 } else {
                     println!("Path: {} | Issue: {} | Severity: {}", i.path.display(), i.issue, i.severity);
+                }
+            }
+        }
+        println!("\nENTROPY SUBSYSTEM");
+        let entropy_errors: Vec<_> = self.findings
+            .iter()
+            .filter(|x| {x.subsys == SubSystem::Entropy})
+            .collect();
+        if entropy_errors.len() == 0 {
+            println!("No Entropy errors found.")
+        } else {
+            for i in entropy_errors {
+                if let Issue::HighEntropy { kind, start, end, entropy, chi2 } = &i.issue {
+                    println!(
+                        "Path: {} | {} at {}..{} | entropy {:.2} | chi2 {:.0} | Severity: {}",
+                        i.path.display(), kind, start, end, entropy, chi2, i.severity
+                    );
                 }
             }
         }

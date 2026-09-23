@@ -2,13 +2,15 @@ mod cli;
 mod tools;
 mod yara;
 mod report;
+mod entropy;
 
 use anyhow::Result;
 use cli::_parse_arguments;
 use std::fs::{read, metadata};
+use crate::entropy::get_entropy;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
 use crate::tools::{archive_analysis, get_checksum, get_filetype, process_reported_filetype};
-use crate::yara::get_yara_matches;
+use crate::yara::{build_rules, get_yara_matches};
 
 fn main() -> Result<()> {
     let args = _parse_arguments();
@@ -26,7 +28,7 @@ fn main() -> Result<()> {
         filetype
     );
 
-    match final_report.reported_filetype.trim().to_lowercase() 
+    match final_report.reported_filetype.trim().to_lowercase()
         == final_report.real_filetype.extension().trim().to_lowercase() {
         true => {}
         false => {
@@ -39,13 +41,21 @@ fn main() -> Result<()> {
         }
     }
 
-    get_yara_matches(include_str!("rules/malware_index.yar"), &bytes, &mut final_report)?;
+    let rule_set = build_rules();
+    eprintln!(
+        "YARA: {} rule files loaded, {} skipped (yara-x incompatible): {:?}",
+        rule_set.loaded_files,
+        rule_set.skipped_files.len(),
+        rule_set.skipped_files
+    );
 
-    archive_analysis(&bytes, &mut final_report)
+    get_yara_matches(&rule_set.rules, &bytes, &mut final_report)?;
+
+    archive_analysis(&bytes, &rule_set.rules, &mut final_report)
         .unwrap_or_else(|_| eprintln!("The file is not a zip archive or unparsable."));
-    
-    
-    
+
+    get_entropy(&bytes, &mut final_report)?;
+
     final_report.generate_report();
 
     Ok(())
