@@ -47,6 +47,13 @@ cargo install --path .
 If you don't have rust, this website helps the installation with rustup:  
 https://rust-lang.org/tools/install/
 
+To use the Virus Total subsystem, you have to get an API key on virustotal.com, and you have to set the API key to your system:
+```
+export VT_API_KEY=
+```
+
+It is even better if you add it to your ~/.bashrc or ~/.zshrc, too.
+
 ## Contribute
 If you want to contribute, you can clone the project with:
 ```

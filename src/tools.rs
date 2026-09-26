@@ -8,174 +8,16 @@ use anyhow::{Result, anyhow};
 use yara_x::{Rules, Scanner};
 use zip::ZipArchive;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
+use crate::constants::{ACTIVE_CONTENT_MARKERS, HIGH_RISK_EXTENSIONS, MARKUP_TYPES, YARA_SCAN_EXTENSIONS};
 
-pub const HIGH_RISK_EXTENSIONS: &[&str] = &[
-    // Native executables / libraries
-    "exe",
-    "dll",
-    "com",
-    "scr",
-    "cpl",
-    "ocx",
-    "sys",
-    "drv",
-    "app",
-
-    // Installers / packages
-    "msi",
-    "msp",
-    "mst",
-    "cab",
-    "pkg",
-    "dmg",
-    "iso",
-
-    // Scripts / command files
-    "bat",
-    "cmd",
-    "js",
-    "jse",
-    "vbs",
-    "vbe",
-    "wsf",
-    "wsh",
-    "ps1",
-    "psm1",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "command",
-    "pl",
-    "py",
-    "rb",
-
-    // Shortcuts / link-like files
-    "lnk",
-    "url",
-    "scf",
-    "shb",
-    "shs",
-
-    // Java / .NET related executable content
-    "jar",
-    "class",
-
-    // Macro-enabled Office documents
-    "docm",
-    "dotm",
-    "xlsm",
-    "xltm",
-    "xlam",
-    "pptm",
-    "potm",
-    "ppsm",
-    "ppam",
-
-    // HTML / web content that can contain active content
-    "hta",
-    "html",
-    "htm",
-    "svg",
-
-    // Apple executable / bundle-related
-    "dylib",
-    "bundle",
-    "framework",
-];
-
-pub const YARA_SCAN_EXTENSIONS: &[&str] = &[
-    // Executables / native code
-    "exe",
-    "dll",
-    "com",
-    "scr",
-    "cpl",
-    "ocx",
-    "sys",
-    "drv",
-    "dylib",
-    "app",
-    "bundle",
-    "framework",
-    "elf",
-    "so",
-
-    // Scripts / interpreted code
-    "js",
-    "jse",
-    "mjs",
-    "vbs",
-    "vbe",
-    "wsf",
-    "wsh",
-    "ps1",
-    "psm1",
-    "bat",
-    "cmd",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "command",
-    "py",
-    "pl",
-    "pm",
-    "rb",
-    "php",
-
-    // Web / markup / active content
-    "html",
-    "htm",
-    "xhtml",
-    "xht",
-    "xml",
-    "svg",
-    "hta",
-
-    // Documents that can contain active content / macros
-    "pdf",
-    "rtf",
-    "doc",
-    "dot",
-    "docm",
-    "dotm",
-    "xls",
-    "xlt",
-    "xlsm",
-    "xltm",
-    "xlam",
-    "ppt",
-    "pot",
-    "pps",
-    "pptm",
-    "potm",
-    "ppsm",
-    "ppam",
-
-    // Java / managed executable content
-    "jar",
-    "class",
-    "war",
-    "ear",
-
-    // Installers / packages
-    "msi",
-    "msp",
-    "pkg",
-    "dmg",
-
-    // Archives / containers
-    "zip",
-    "7z",
-    "rar",
-    "tar",
-    "gz",
-    "bz2",
-    "xz",
-    "iso",
-];
-
+fn find_active_content(contents: &[u8]) -> Vec<&'static str> {
+    let text = String::from_utf8_lossy(contents).to_lowercase();
+    ACTIVE_CONTENT_MARKERS
+        .iter()
+        .copied()
+        .filter(|marker| text.contains(marker))
+        .collect()
+}
 
 /// Gets the SHA256 checksum of a Vec<u8> vector and returns the checksum as a String.
 pub fn get_checksum(bytes: &[u8]) -> String {
@@ -278,6 +120,20 @@ pub fn archive_analysis(data: &[u8], rules: &Rules, report: &mut Report) -> Resu
                 Severity::High,
                 SubSystem::Archive
             ));
+        }
+
+        let is_markup = MARKUP_TYPES.contains(&reported_ext) || MARKUP_TYPES.contains(&detected_ext);
+
+        if is_markup {
+            let found = find_active_content(&contents);
+            if !found.is_empty() {
+                report.add_finding(Finding::new(
+                    path.clone(),
+                    Issue::ActiveContent(found.join(", ")),
+                    Severity::Medium,
+                    SubSystem::Archive,
+                ));
+            }
         }
 
         if YARA_SCAN_EXTENSIONS.contains(&reported_ext)

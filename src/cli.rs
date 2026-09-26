@@ -12,7 +12,11 @@ pub struct Args {
 
     /// Download the latest YARA Forge rules
     #[arg(long)]
-    pub update_rules: bool
+    pub update_rules: bool,
+
+    /// Enable Virus Total scan on the checksum of the file
+    #[arg(long)]
+    pub vt: bool
 }
 
 pub fn _parse_arguments() -> Args {

@@ -3,6 +3,8 @@ mod tools;
 mod yara;
 mod report;
 mod entropy;
+pub mod constants;
+pub mod virustotal;
 
 use anyhow::{anyhow, Result};
 use cli::_parse_arguments;
@@ -10,6 +12,7 @@ use std::fs::{read, metadata};
 use crate::entropy::get_entropy;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
 use crate::tools::{archive_analysis, get_checksum, get_filetype, process_reported_filetype};
+use crate::virustotal::{lookup_hash, VirusTotalResult, vt_severity};
 use crate::yara::{get_yara_matches, load_rules, update_rules};
 
 fn main() -> Result<()> {
@@ -66,6 +69,29 @@ fn main() -> Result<()> {
         .unwrap_or_else(|_| eprintln!("The file is not a zip archive or unparsable."));
 
     get_entropy(&bytes, &mut final_report)?;
+
+    if args.vt {
+        final_report.vt_status = Some(match std::env::var("VT_API_KEY") {
+            Err(_) => "not run: VT_API_KEY is not set".to_string(),
+            Ok(key) => match lookup_hash(&final_report.checksum, &key) {
+                Err(e) => format!("lookup failed: {e}"),
+                Ok(VirusTotalResult::Unknown) => "not found (this file was never submitted)".to_string(),
+                Ok(VirusTotalResult::Known { malicious, suspicious, harmless, undetected, label }) => {
+                    let total = malicious + suspicious + harmless + undetected;
+
+                    if let Some(severity) = vt_severity(malicious, suspicious) {
+                        final_report.add_finding(Finding::new(
+                            final_report.filepath.clone(),
+                            Issue::VirusTotal { malicious, suspicious, total, label },
+                            severity,
+                            SubSystem::VirusTotal,
+                        ));
+                    }
+                    format!("{malicious}/{total} engines flagged this file")
+                }
+            },
+        });
+    }
 
     final_report.generate_report();
 

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use derive_more::Display;
+use crate::constants::{ENTROPY_DOCUMENT_TYPES, ENTROPY_EXECUTABLE_TYPES, ENTROPY_EXPECTED_HIGH};
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
 
 #[derive(PartialEq, Debug, Clone, Copy, Display)]
@@ -23,37 +24,6 @@ struct Region {
 const WINDOW: usize = 4096;
 const STRIDE: usize = WINDOW/2;
 const MIN_REGION_BYTES: usize = 10 * 1024;
-
-pub const ENTROPY_EXECUTABLE_TYPES: &[&str] = &[
-    "exe", "dll", "sys", "scr", "cpl", "ocx", "drv", "com",
-    "elf", "so", "mach", "dylib", "bundle",
-    "class", "dex", "wasm", "obj",
-
-    "sh", "bash", "zsh", "fish", "command",
-    "ps1", "psm1", "bat", "cmd",
-    "js", "jse", "mjs", "vbs", "vbe", "wsf", "wsh",
-    "py", "pl", "pm", "rb", "php",
-
-    "hta", "html", "htm", "xhtml", "xht", "svg",
-];
-
-pub const ENTROPY_DOCUMENT_TYPES: &[&str] = &[
-    "doc", "dot", "xls", "xlt", "ppt", "pot", "pps",
-    "rtf", "txt", "csv", "md", "json", "xml", "ps",
-];
-
-pub const ENTROPY_EXPECTED_HIGH: &[&str] = &[
-    "zip", "gz", "bz2", "bz3", "xz", "7z", "rar", "zst", "lz", "lz4",
-    "cab", "deb", "rpm", "dmg", "msi",
-    "epub", "mobi", "jar", "war", "ear", "apk", "crx",
-    "docx", "xlsx", "pptx", "odt", "ods", "odp",
-    "docm", "dotm", "xlsm", "xltm", "xlam", "pptm", "potm", "ppsm", "ppam",
-    "pdf",
-    "jpg", "jpeg", "png", "gif", "webp", "heif", "avif", "jxl", "jp2",
-    "mp3", "m4a", "aac", "ogg", "opus", "flac",
-    "mp4", "m4v", "mkv", "webm", "mov", "avi", "wmv", "flv",
-    "woff", "woff2", "swf",
-];
 
 pub fn get_entropy(bytes: &[u8], report: &mut Report) -> Result<()> {
     let Some(type_severity) = entropy_severity(report.reported_filetype.as_str(), report.real_filetype.extension()) else {

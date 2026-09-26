@@ -19,6 +19,12 @@ pub enum Issue {
         entropy: f64,
         chi2: f64,
     },
+    #[display("ActiveContent")]
+    ActiveContent(String),
+
+    #[display("VirusTotal")]
+    VirusTotal { malicious: u64, suspicious: u64, total: u64, label: Option<String> },
+
     Size
 }
 
@@ -35,7 +41,8 @@ pub enum SubSystem {
     Base,
     Yara,
     Archive,
-    Entropy
+    Entropy,
+    VirusTotal
 }
 
 #[derive(Debug, PartialEq, Display)]
@@ -68,7 +75,8 @@ pub struct Report {
     pub metadata: Metadata,
     pub checksum: String,
     pub reported_filetype: String,
-    pub real_filetype: Type
+    pub real_filetype: Type,
+    pub vt_status: Option<String>,
 }
 
 impl Report {
@@ -83,7 +91,8 @@ impl Report {
             metadata,
             checksum,
             reported_filetype,
-            real_filetype
+            real_filetype,
+            vt_status: None
         }
     }
 
@@ -159,6 +168,9 @@ impl Report {
                 } else if let Issue::HighRiskFileType(types) = &i.issue  {
                     println!("Path: {} | Issue: {} | Problem: {} | Severity: {}",
                              i.path.display(), i.issue, types, i.severity);
+                } else if let Issue::ActiveContent(markers) = &i.issue  {
+                    println!("Path: {} | Issue: {} | Markers: {} | Severity: {}",
+                             i.path.display(), i.issue, markers, i.severity);
                 } else {
                     println!("Path: {} | Issue: {} | Severity: {}", i.path.display(), i.issue, i.severity);
                 }
@@ -180,6 +192,26 @@ impl Report {
                     );
                 }
             }
+        }
+        println!("\nVIRUS TOTAL SUBSYSTEM");
+        match &self.vt_status {
+            None => println!("Not run (use --vt)."),
+            Some(status) => println!("{status}"),
+        }
+
+        for i in self.findings.iter().filter(|x| x.subsys == SubSystem::VirusTotal) {
+            if let Issue::VirusTotal { malicious, suspicious, total, label } = &i.issue {
+                println!(
+                    "Detections: {} malicious, {} suspicious of {} | Label: {} | Severity: {}",
+                    malicious, suspicious, total,
+                    label.as_deref().unwrap_or("none"),
+                    i.severity
+                );
+            }
+        }
+
+        if self.vt_status.is_some() {
+            println!("Details: https://www.virustotal.com/gui/file/{}", self.checksum);
         }
     }
 }
