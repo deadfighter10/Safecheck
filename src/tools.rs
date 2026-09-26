@@ -45,7 +45,7 @@ pub fn process_reported_filetype(extension: &Option<&OsStr>) -> Result<String> {
     match extension {
         Some(extension) => {
             match extension.to_os_string().into_string() {
-                Ok(filetype) => { Ok(filetype) }
+                Ok(filetype) => { Ok(normalize_ext(filetype.as_str())) }
                 Err(_err) => {
                     Err(anyhow!("Cannot turn the filetype into UTF-8"))
                 }
@@ -155,4 +155,14 @@ pub fn archive_analysis(data: &[u8], rules: &Rules, report: &mut Report) -> Resu
     }
 
     Ok(())
+}
+
+fn normalize_ext(ext: &str) -> String {
+    match ext.trim().to_lowercase().as_str() {
+        "jpeg" | "jpe" => "jpg".into(),
+        "tif" => "tiff".into(),
+        "htm" => "html".into(),
+        "yml" => "yaml".into(),
+        other => other.into(),
+    }
 }

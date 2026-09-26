@@ -9,6 +9,7 @@ pub mod virustotal;
 use anyhow::{anyhow, Result};
 use cli::_parse_arguments;
 use std::fs::{read, metadata};
+use crate::constants::ENTROPY_EXECUTABLE_TYPES;
 use crate::entropy::get_entropy;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
 use crate::tools::{archive_analysis, get_checksum, get_filetype, process_reported_filetype};
@@ -31,7 +32,7 @@ fn main() -> Result<()> {
 
     let bytes = read(&path)?;
     let metadata = metadata(&path)?;
-    let filetype = get_filetype(&bytes)?;
+    let filetype = get_filetype(&bytes).ok();
     let reported_filetype = process_reported_filetype(&path.extension())?;
     let checksum = get_checksum(&bytes);
     let mut final_report = Report::new(
@@ -42,17 +43,16 @@ fn main() -> Result<()> {
         filetype
     );
 
-    match final_report.reported_filetype.trim().to_lowercase()
-        == final_report.real_filetype.extension().trim().to_lowercase() {
-        true => {}
-        false => {
-            final_report.add_finding(Finding::new(
-                path,
-                Issue::MagicByte,
-                Severity::Critical,
-                SubSystem::Base
-            ))
-        }
+    let reported = final_report.reported_filetype.as_str();
+    let detected = final_report.real_filetype.map(|t| t.extension()).unwrap_or("");
+
+    if !detected.is_empty() && reported != detected && reported != "No filetype" {
+        let severity = if ENTROPY_EXECUTABLE_TYPES.contains(&detected) {
+            Severity::Critical
+        } else {
+            Severity::Low
+        };
+        final_report.add_finding(Finding::new(path.clone(), Issue::MagicByte, severity, SubSystem::Base));
     }
 
     let rule_set = load_rules();

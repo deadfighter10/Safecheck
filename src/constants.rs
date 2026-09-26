@@ -11,6 +11,7 @@ pub const HIGH_RISK_EXTENSIONS: &[&str] = &[
     "sys",
     "drv",
     "app",
+    "hta",
 
     // Installers / packages
     "msi",

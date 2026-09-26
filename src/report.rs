@@ -75,12 +75,12 @@ pub struct Report {
     pub metadata: Metadata,
     pub checksum: String,
     pub reported_filetype: String,
-    pub real_filetype: Type,
+    pub real_filetype: Option<Type>,
     pub vt_status: Option<String>,
 }
 
 impl Report {
-    pub fn new(filepath: PathBuf, metadata: Metadata, checksum: String, reported_filetype: String, real_filetype: Type) -> Report {
+    pub fn new(filepath: PathBuf, metadata: Metadata, checksum: String, reported_filetype: String, real_filetype: Option<Type>) -> Report {
         Report {
             findings: Vec::new(),
             critical_threats:0,
@@ -128,15 +128,23 @@ impl Report {
         println!("Is file: {}", self.metadata.is_file());
         println!("Is folder: {}", self.metadata.is_dir());
         println!("Reported extension {}", self.reported_filetype);
-        println!("Real extension: {}", self.real_filetype.extension());
-        println!("MIME type: {}", self.real_filetype.mime_type());
-        match self.reported_filetype.trim().to_lowercase()
-            == self.real_filetype.extension().trim().to_lowercase() {
-            true => {}
-            false => {
-                println!("MAGIC BYTE MISMATCH ERROR! | Severity: {}", Severity::Critical)
+        match self.real_filetype {
+            Some(t) => {
+                println!("Real extension: {}", t.extension());
+                println!("MIME type: {}", t.mime_type());
             }
+            None => println!("Real extension: unknown (no recognizable magic bytes)"),
         }
+
+        for i in self.findings.iter().filter(|x| x.subsys == SubSystem::Base) {
+            println!(
+                "MAGIC BYTE MISMATCH | reported: {} | detected: {} | Severity: {}",
+                self.reported_filetype,
+                self.real_filetype.map(|t| t.extension()).unwrap_or("unknown"),
+                i.severity
+            );
+        }
+
         println!("\nYARA SUBSYSTEM");
         let yara_errors: Vec<_> = self.findings
             .iter()

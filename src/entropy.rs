@@ -26,7 +26,8 @@ const STRIDE: usize = WINDOW/2;
 const MIN_REGION_BYTES: usize = 10 * 1024;
 
 pub fn get_entropy(bytes: &[u8], report: &mut Report) -> Result<()> {
-    let Some(type_severity) = entropy_severity(report.reported_filetype.as_str(), report.real_filetype.extension()) else {
+    let detected = report.real_filetype.map(|t| t.extension()).unwrap_or("");
+    let Some(type_severity) = entropy_severity(report.reported_filetype.as_str(), detected) else {
         return Ok(());
     };
 
