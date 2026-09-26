@@ -182,6 +182,9 @@ impl Report {
                 } else if let Issue::ActiveContent(markers) = &i.issue  {
                     println!("Path: {} | Issue: {} | Markers: {} | Severity: {}",
                              i.path.display(), i.issue, markers, i.severity);
+                } else if let Issue::Unreadable(reason) = &i.issue {
+                    println!("Path: {} | Issue: {} | Reason: {} | Severity: {}",
+                             i.path.display(), i.issue, reason, i.severity);
                 } else {
                     println!("Path: {} | Issue: {} | Severity: {}", i.path.display(), i.issue, i.severity);
                 }
