@@ -1,5 +1,7 @@
 pub const MARKUP_TYPES: &[&str] = &["html", "htm", "xhtml", "xht", "svg"];
 
+pub const MAX_ENTRY_BYTES: u64 = 8_000_000;
+
 pub const HIGH_RISK_EXTENSIONS: &[&str] = &[
     // Native executables / libraries
     "exe",

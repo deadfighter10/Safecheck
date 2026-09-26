@@ -8,7 +8,7 @@ use anyhow::{Result, anyhow};
 use yara_x::{Rules, Scanner};
 use zip::ZipArchive;
 use crate::report::{Finding, Issue, Report, Severity, SubSystem};
-use crate::constants::{ACTIVE_CONTENT_MARKERS, HIGH_RISK_EXTENSIONS, MARKUP_TYPES, YARA_SCAN_EXTENSIONS};
+use crate::constants::{ACTIVE_CONTENT_MARKERS, HIGH_RISK_EXTENSIONS, MARKUP_TYPES, MAX_ENTRY_BYTES};
 
 fn find_active_content(contents: &[u8]) -> Vec<&'static str> {
     let text = String::from_utf8_lossy(contents).to_lowercase();
@@ -65,8 +65,22 @@ pub fn archive_analysis(data: &[u8], rules: &Rules, report: &mut Report) -> Resu
 
     let mut scanner = Scanner::new(&rules);
 
+
     for i in 0..archive.len() {
-        let mut zipped_file = archive.by_index(i)?;
+        let name = archive.by_index_raw(i).map(|f| f.name().to_string()).unwrap_or_default();
+
+        let mut zipped_file = match archive.by_index(i) {
+            Ok(f) => f,
+            Err(e) => {
+                report.add_finding(Finding::new(
+                    PathBuf::from(name),
+                    Issue::Unreadable(e.to_string()),
+                    Severity::Medium,
+                    SubSystem::Archive,
+                ));
+                continue;
+            }
+        };
         if zipped_file.is_dir() {
             continue;
         }
@@ -75,28 +89,33 @@ pub fn archive_analysis(data: &[u8], rules: &Rules, report: &mut Report) -> Resu
 
         let mut contents = Vec::new();
 
-        if zipped_file.size() > 8000000 {
+        // Read at most MAX_ENTRY_BYTES, regardless of the size the zip header claims.
+        // This protects against zip bombs and lets oversized entries still be scanned.
+        if (&mut zipped_file).take(MAX_ENTRY_BYTES).read_to_end(&mut contents).is_err() {
+            report.add_finding(Finding::new(
+                path.clone(),
+                Issue::Unreadable("failed to decompress".into()),
+                Severity::Medium,
+                SubSystem::Archive,
+            ));
+            continue;
+        }
+
+        if contents.len() as u64 == MAX_ENTRY_BYTES {
+            // Hit the cap: flag it, but keep going so the first MAX_ENTRY_BYTES still get scanned
             report.add_finding(Finding::new(
                 path.clone(),
                 Issue::Size,
                 Severity::Medium,
-                SubSystem::Archive
+                SubSystem::Archive,
             ));
-            continue
-        }
-
-        if zipped_file.size() == 0 {
+        } else if contents.is_empty() {
             report.add_finding(Finding::new(
                 path.clone(),
                 Issue::Size,
                 Severity::Low,
-                SubSystem::Archive
-            ))
-        }
-
-        if zipped_file.read_to_end(&mut contents).is_err() {
-            eprintln!("Failed to retrieve the content of {}.", zipped_file.name());
-            continue;
+                SubSystem::Archive,
+            ));
         }
 
         let filetype = get_filetype(&contents).ok();
@@ -136,19 +155,24 @@ pub fn archive_analysis(data: &[u8], rules: &Rules, report: &mut Report) -> Resu
             }
         }
 
-        if YARA_SCAN_EXTENSIONS.contains(&reported_ext)
-            || YARA_SCAN_EXTENSIONS.contains(&detected_ext)
-        {
-            let scanresults = scanner.scan(&contents)?;
-            if scanresults.matching_rules().len() != 0 {
-                for f in scanresults.matching_rules() {
+        match scanner.scan(&contents) {
+            Ok(results) => {
+                for rule in results.matching_rules() {
                     report.add_finding(Finding::new(
                         path.clone(),
-                        Issue::YaraIssue(f.identifier().to_string()),
+                        Issue::YaraIssue(rule.identifier().to_string()),
                         Severity::Critical,
-                        SubSystem::Archive
-                    ))
+                        SubSystem::Archive,
+                    ));
                 }
+            }
+            Err(e) => {
+                report.add_finding(Finding::new(
+                    path.clone(),
+                    Issue::Unreadable(format!("YARA scan failed: {e}")),
+                    Severity::Medium,
+                    SubSystem::Archive,
+                ));
             }
         }
 

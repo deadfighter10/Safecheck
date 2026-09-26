@@ -25,7 +25,10 @@ pub enum Issue {
     #[display("VirusTotal")]
     VirusTotal { malicious: u64, suspicious: u64, total: u64, label: Option<String> },
 
-    Size
+    Size,
+
+    #[display("Unreadable")]
+    Unreadable(String)
 }
 
 #[derive(Debug, PartialEq, Display, Copy, Clone)]
