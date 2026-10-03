@@ -1,0 +1,1 @@
+That ebook looks harmless. Safecheck opens it up without running a thing and finds the EICAR payload hiding as cover.exe, in 0.97 seconds. Static file security analyzer, written in Rust.

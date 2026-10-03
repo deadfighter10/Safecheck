@@ -1,4 +1,12 @@
 # Safecheck
+
+<p align="center">
+  <a href="promo/brag.mp4">
+    <img src="promo/brag.gif" alt="Safecheck scans a clean PDF, then flags an executable disguised as invoice.pdf" width="800">
+  </a>
+  <br>
+</p>
+
 ## Description
 This project is a simple security tool to check suspicious files statically to see if they are likely or not to contain 
 any malicious code. The whole project was written in rust, and is cross-platform.

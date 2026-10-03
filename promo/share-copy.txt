@@ -1,0 +1,1 @@
+Two PDFs. One of them is an executable wearing a .pdf extension. Safecheck catches the mismatch in under a second, without ever running the file. Static file security analyzer, written in Rust.

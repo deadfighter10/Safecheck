@@ -1,3 +1,14 @@
 /target
 tests/test.epub
 .env
+# promo: track only the finished material (videos, images, share copy)
+promo/*
+!promo/brag.mp4
+!promo/brag.gif
+!promo/brag.jpg
+!promo/share-copy.txt
+!promo/versions/
+promo/versions/*/*
+!promo/versions/*/brag.mp4
+!promo/versions/*/brag.jpg
+!promo/versions/*/share-copy.txt

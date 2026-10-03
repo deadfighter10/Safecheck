@@ -1,0 +1,1 @@
+Someone sent you an ebook. Safecheck reports one Critical threat. It is the EICAR test file. Static file security analyzer, written in Rust.
